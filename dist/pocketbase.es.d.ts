@@ -1,3 +1,5 @@
+import { Cookies } from "@sveltejs/kit";
+import { CookieSerializeOptions } from "cookie";
 interface ParseOptions {
     decode?: (val: string) => string;
 }
@@ -255,6 +257,16 @@ declare class BaseAuthStore {
      */
     onChange(callback: OnStoreChangeFunc, fireImmediately?: boolean): () => void;
     protected triggerChange(): void;
+}
+declare class SvelteKitAuthStore extends BaseAuthStore {
+    constructor();
+    getCookie(): string;
+    saveCookie(cookies: Cookies, key?: string, opts?: CookieSerializeOptions & {
+        path: string;
+    }): void;
+    clearCookie(cookies: Cookies, key?: string, opts?: CookieSerializeOptions & {
+        path: string;
+    }): void;
 }
 /**
  * BaseService class that should be inherited from all API services.
@@ -1220,6 +1232,7 @@ interface BeforeSendResult {
         [key: string]: any;
     };
 }
+type Fetch = typeof fetch;
 /**
  * PocketBase JS Client.
  */
@@ -1228,6 +1241,7 @@ declare class Client {
      * The base PocketBase backend url address (eg. 'http://127.0.0.1.8090').
      */
     baseURL: string;
+    fetch: Fetch;
     /**
      * Legacy getter alias for baseURL.
      * @deprecated Please replace with baseURL.
@@ -1296,7 +1310,7 @@ declare class Client {
     /**
      * A replaceable instance of the local auth store service.
      */
-    authStore: BaseAuthStore;
+    authStore: SvelteKitAuthStore;
     /**
      * An instance of the service that handles the **Settings APIs**.
      */
@@ -1332,7 +1346,7 @@ declare class Client {
     private cancelControllers;
     private recordServices;
     private enableAutoCancellation;
-    constructor(baseURL?: string, authStore?: BaseAuthStore | null, lang?: string);
+    constructor(baseURL?: string, authStore?: SvelteKitAuthStore | null, lang?: string, customFetch?: Fetch);
     /**
      * @deprecated
      * With PocketBase v0.23.0 admins are converted to a regular auth
@@ -1580,4 +1594,4 @@ declare function getTokenPayload(token: string): {
  * @param [expirationThreshold] Time in seconds that will be subtracted from the token `exp` property.
  */
 declare function isTokenExpired(token: string, expirationThreshold?: number): boolean;
-export { Client as default, BeforeSendResult, ClientResponseError, CollectionService, HealthCheckResponse, HealthService, HourlyStats, LogService, UnsubscribeFunc, RealtimeService, RecordAuthResponse, AuthProviderInfo, AuthMethodsList, RecordSubscription, OAuth2UrlCallback, OAuth2AuthConfig, OTPResponse, RecordService, CrudService, BatchRequest, BatchRequestResult, BatchService, SubBatchService, AsyncSaveFunc, AsyncClearFunc, AsyncAuthStore, AuthRecord, AuthModel, OnStoreChangeFunc, BaseAuthStore, LocalAuthStore, ListResult, BaseModel, LogModel, RecordModel, CollectionField, TokenConfig, AuthAlertConfig, OTPConfig, MFAConfig, PasswordAuthConfig, OAuth2Provider, OAuth2Config, EmailTemplate, BaseCollectionModel, ViewCollectionModel, AuthCollectionModel, CollectionModel, SendOptions, CommonOptions, ListOptions, FullListOptions, RecordOptions, RecordListOptions, RecordFullListOptions, RecordSubscribeOptions, LogStatsOptions, FileOptions, AuthOptions, normalizeUnknownQueryParams, serializeQueryParams, ParseOptions, cookieParse, SerializeOptions, cookieSerialize, getTokenPayload, isTokenExpired };
+export { Client as default, BeforeSendResult, ClientResponseError, CollectionService, HealthCheckResponse, HealthService, HourlyStats, LogService, UnsubscribeFunc, RealtimeService, RecordAuthResponse, AuthProviderInfo, AuthMethodsList, RecordSubscription, OAuth2UrlCallback, OAuth2AuthConfig, OTPResponse, RecordService, CrudService, BatchRequest, BatchRequestResult, BatchService, SubBatchService, AsyncSaveFunc, AsyncClearFunc, AsyncAuthStore, AuthRecord, AuthModel, OnStoreChangeFunc, BaseAuthStore, LocalAuthStore, SvelteKitAuthStore, ListResult, BaseModel, LogModel, RecordModel, CollectionField, TokenConfig, AuthAlertConfig, OTPConfig, MFAConfig, PasswordAuthConfig, OAuth2Provider, OAuth2Config, EmailTemplate, BaseCollectionModel, ViewCollectionModel, AuthCollectionModel, CollectionModel, SendOptions, CommonOptions, ListOptions, FullListOptions, RecordOptions, RecordListOptions, RecordFullListOptions, RecordSubscribeOptions, LogStatsOptions, FileOptions, AuthOptions, normalizeUnknownQueryParams, serializeQueryParams, ParseOptions, cookieParse, SerializeOptions, cookieSerialize, getTokenPayload, isTokenExpired };

@@ -1,3 +1,5 @@
+import { Cookies } from "@sveltejs/kit";
+import { CookieSerializeOptions } from "cookie";
 interface SerializeOptions {
     encode?: (val: string | number | boolean) => string;
     maxAge?: number;
@@ -233,6 +235,16 @@ declare class BaseAuthStore {
      */
     onChange(callback: OnStoreChangeFunc, fireImmediately?: boolean): () => void;
     protected triggerChange(): void;
+}
+declare class SvelteKitAuthStore extends BaseAuthStore {
+    constructor();
+    getCookie(): string;
+    saveCookie(cookies: Cookies, key?: string, opts?: CookieSerializeOptions & {
+        path: string;
+    }): void;
+    clearCookie(cookies: Cookies, key?: string, opts?: CookieSerializeOptions & {
+        path: string;
+    }): void;
 }
 /**
  * BaseService class that should be inherited from all API services.
@@ -1177,6 +1189,7 @@ interface BeforeSendResult {
         [key: string]: any;
     };
 }
+type Fetch = typeof fetch;
 /**
  * PocketBase JS Client.
  */
@@ -1185,6 +1198,7 @@ declare class Client {
      * The base PocketBase backend url address (eg. 'http://127.0.0.1.8090').
      */
     baseURL: string;
+    fetch: Fetch;
     /**
      * Legacy getter alias for baseURL.
      * @deprecated Please replace with baseURL.
@@ -1253,7 +1267,7 @@ declare class Client {
     /**
      * A replaceable instance of the local auth store service.
      */
-    authStore: BaseAuthStore;
+    authStore: SvelteKitAuthStore;
     /**
      * An instance of the service that handles the **Settings APIs**.
      */
@@ -1289,7 +1303,7 @@ declare class Client {
     private cancelControllers;
     private recordServices;
     private enableAutoCancellation;
-    constructor(baseURL?: string, authStore?: BaseAuthStore | null, lang?: string);
+    constructor(baseURL?: string, authStore?: SvelteKitAuthStore | null, lang?: string, customFetch?: Fetch);
     /**
      * @deprecated
      * With PocketBase v0.23.0 admins are converted to a regular auth
