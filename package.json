@@ -1,12 +1,12 @@
 {
     "version": "0.26.8",
-    "name": "pocketbase",
-    "description": "PocketBase JavaScript SDK",
+    "name": "pocketbase-sveltekit",
+    "description": "PocketBase JavaScript SDK for SvelteKit",
     "author": "Gani Georgiev",
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "git://github.com/pocketbase/js-sdk.git"
+        "url": "git://github.com/velastack/pocketbase-sveltekit.git"
     },
     "exports": {
         ".": "./dist/pocketbase.es.mjs",
@@ -38,6 +38,8 @@
     },
     "devDependencies": {
         "@rollup/plugin-terser": "^0.4.3",
+        "@sveltejs/kit": "^2.25.1",
+        "@types/cookie": "^0.6.0",
         "prettier": "3.2.4",
         "rollup": "^4.0.0",
         "rollup-plugin-ts": "^3.0.0",

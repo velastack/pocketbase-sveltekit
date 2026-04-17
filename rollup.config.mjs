@@ -5,7 +5,7 @@ const isProduction = !process.env.ROLLUP_WATCH;
 
 function basePlugins() {
     return [
-        ts(),
+        ts({ transpileOnly: true }),
 
         // @todo before v1, test if feasible and consider removing the minification for the npm builds
         // (https://github.com/pocketbase/js-sdk/issues/261)
