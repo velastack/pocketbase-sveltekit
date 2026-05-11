@@ -1,7 +1,7 @@
 import Client from "@/Client";
 import { ClientResponseError } from "@/ClientResponseError";
 import { RealtimeService, UnsubscribeFunc } from "@/services/RealtimeService";
-import { BaseAuthStore } from "@/stores/BaseAuthStore";
+import { SvelteKitAuthStore } from "@/stores/SveltekitAuthStore";
 import { CrudService } from "@/services/CrudService";
 import { ListResult, RecordModel } from "@/tools/dtos";
 import { normalizeLegacyOptionsArgs } from "@/tools/legacy";
@@ -1161,7 +1161,7 @@ export class RecordService<M = RecordModel> extends CrudService<M> {
         // ---
         const client = new Client(
             this.client.baseURL,
-            new BaseAuthStore(),
+            new SvelteKitAuthStore(),
             this.client.lang,
         );
 
