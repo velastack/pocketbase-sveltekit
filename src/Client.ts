@@ -1,6 +1,5 @@
 import { ClientResponseError } from "@/ClientResponseError";
-import { BaseAuthStore } from "@/stores/BaseAuthStore";
-import { LocalAuthStore } from "@/stores/LocalAuthStore";
+import { SvelteKitAuthStore } from "@/stores/SveltekitAuthStore";
 import { SettingsService } from "@/services/SettingsService";
 import { RecordService } from "@/services/RecordService";
 import { CollectionService } from "@/services/CollectionService";
@@ -26,6 +25,8 @@ export interface BeforeSendResult {
     options?: { [key: string]: any };
 }
 
+type Fetch = typeof fetch;
+
 /**
  * PocketBase JS Client.
  */
@@ -34,6 +35,8 @@ export default class Client {
      * The base PocketBase backend url address (eg. 'http://127.0.0.1.8090').
      */
     baseURL: string;
+
+    fetch: Fetch;
 
     /**
      * Legacy getter alias for baseURL.
@@ -116,7 +119,7 @@ export default class Client {
     /**
      * A replaceable instance of the local auth store service.
      */
-    authStore: BaseAuthStore;
+    authStore: SvelteKitAuthStore;
 
     /**
      * An instance of the service that handles the **Settings APIs**.
@@ -162,17 +165,20 @@ export default class Client {
     private recordServices: { [key: string]: RecordService } = {};
     private enableAutoCancellation: boolean = true;
 
-    constructor(baseURL = "/", authStore?: BaseAuthStore | null, lang = "en-US") {
+    constructor(
+        baseURL = "/",
+        authStore?: SvelteKitAuthStore | null,
+        lang = "en-US",
+        customFetch: Fetch = fetch,
+    ) {
         this.baseURL = baseURL;
+        this.fetch = customFetch;
         this.lang = lang;
 
         if (authStore) {
             this.authStore = authStore;
-        } else if (typeof window != "undefined" && !!(window as any).Deno) {
-            // note: to avoid common security issues we fallback to runtime/memory store in case the code is running in Deno env
-            this.authStore = new BaseAuthStore();
         } else {
-            this.authStore = new LocalAuthStore();
+            this.authStore = new SvelteKitAuthStore();
         }
 
         // common services
@@ -415,7 +421,7 @@ export default class Client {
         }
 
         // early throw an abort error in case the request was already cancelled
-        const fetchFunc = options.fetch || fetch;
+        const fetchFunc = options.fetch || this.fetch;
 
         // send the request
         return fetchFunc(url, options)
