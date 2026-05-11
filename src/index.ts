@@ -12,6 +12,7 @@ export * from "@/services/BatchService";
 export * from "@/stores/AsyncAuthStore";
 export * from "@/stores/BaseAuthStore";
 export * from "@/stores/LocalAuthStore";
+export * from "@/stores/SveltekitAuthStore";
 export * from "@/tools/dtos";
 export * from "@/tools/options";
 export * from "@/tools/cookie";
