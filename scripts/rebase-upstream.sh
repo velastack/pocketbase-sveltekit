@@ -111,13 +111,32 @@ fi
 echo "==> Rebasing $PATCH_BRANCH onto $latest_tag ($target_sha)"
 git checkout "$PATCH_BRANCH"
 
-# Drop the previous run's cleanup commit so the rebase only replays real patches.
-# Without this, the cleanup commit's dist deletions would collide with upstream's
-# updated dist files every release.
-if [ "$(git log -1 --format='%s' HEAD)" = "$CLEANUP_MSG" ]; then
-    echo "    dropping previous cleanup commit: $(git log -1 --format='%h %s' HEAD)"
-    git reset --hard HEAD~1
-fi
+# Drop any previous cleanup commits from the patch series, wherever they sit.
+# The cleanup deletes dist/ and pins package.json metadata; replaying it onto a
+# newer upstream (with different dist/ content) is a guaranteed delete/modify
+# conflict. We re-apply the cleanup at the end so it doesn't stack.
+#
+# We look for the cleanup commit anywhere in master..PATCH_BRANCH (not just at
+# HEAD) because other fork patches — script edits, workflow tweaks — can land
+# on top of it between rebase runs.
+while :; do
+    cleanup_sha="$(git log --format='%H' --extended-regexp \
+        --grep="^${CLEANUP_MSG}\$" \
+        "$MASTER_BRANCH..$PATCH_BRANCH" | tail -n1)"
+    [ -z "$cleanup_sha" ] && break
+    echo "    dropping previous cleanup commit: $(git log -1 --format='%h %s' "$cleanup_sha")"
+    if ! git rebase --onto "$cleanup_sha~1" "$cleanup_sha" "$PATCH_BRANCH"; then
+        echo "" >&2
+        echo "Failed to drop cleanup commit $cleanup_sha." >&2
+        echo "Resolve conflicts and run:" >&2
+        echo "    git rebase --continue" >&2
+        echo "    bash scripts/rebase-upstream.sh   # re-run to finish" >&2
+        echo "To give up:" >&2
+        echo "    git rebase --abort" >&2
+        trap - EXIT
+        exit 2
+    fi
+done
 
 if ! git rebase "$target_sha"; then
     echo "" >&2
