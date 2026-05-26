@@ -37,7 +37,7 @@ export default class Client {
      */
     baseURL: string;
 
-    fetch: Fetch;
+    fetch?: Fetch;
 
     /**
      * Legacy getter alias for baseURL.
@@ -175,7 +175,7 @@ export default class Client {
         baseURL = "/",
         authStore?: SvelteKitAuthStore | null,
         lang = "en-US",
-        customFetch: Fetch = fetch,
+        customFetch?: Fetch,
     ) {
         this.baseURL = baseURL;
         this.fetch = customFetch;
@@ -428,7 +428,7 @@ export default class Client {
         }
 
         // early throw an abort error in case the request was already cancelled
-        const fetchFunc = options.fetch || this.fetch;
+        const fetchFunc = options.fetch || this.fetch || fetch;
 
         // send the request
         return fetchFunc(url, options)
