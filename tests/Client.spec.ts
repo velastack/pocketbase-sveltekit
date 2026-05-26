@@ -1,7 +1,7 @@
 import Client from "@/Client";
 import { ClientResponseError } from "@/ClientResponseError";
 import { RecordService } from "@/services/RecordService";
-import { LocalAuthStore } from "@/stores/LocalAuthStore";
+import { SvelteKitAuthStore } from "@/stores/SveltekitAuthStore";
 import { afterAll, afterEach, assert, beforeAll, describe, expect, test } from "vitest";
 import { FetchMock } from "./mocks";
 
@@ -28,7 +28,7 @@ describe("Client", function () {
             const client = new Client("test_base_url", null, "test_language");
 
             assert.equal(client.baseURL, "test_base_url");
-            assert.instanceOf(client.authStore, LocalAuthStore);
+            assert.instanceOf(client.authStore, SvelteKitAuthStore);
             assert.equal(client.lang, "test_language");
         });
 
