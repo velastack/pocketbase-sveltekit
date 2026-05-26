@@ -17,6 +17,14 @@
 #   that cleanup commit before the next rebase, so upstream's patches replay
 #   onto a tree that doesn't fight them, then the cleanup is reapplied.
 #
+#   Our published fork tags (`vX.Y.Z`) share a namespace with upstream's tags,
+#   so the script does NOT fetch upstream tags into the local refs/tags/
+#   namespace (that would clobber our published-version pointers, or fail).
+#   Instead, the latest upstream tag is discovered via `git ls-remote` and the
+#   rebase target is the resolved commit SHA. Any leftover local tag that's
+#   still pointing at an upstream commit (from an older `--tags` fetch) is
+#   cleaned up so `git tag vX.Y.Z` after publish works without --force.
+#
 # After a successful rebase the script:
 #   1. Sets the fork's name/description/repo via `npm pkg set`. The version
 #      line is whatever upstream tagged, untouched.
@@ -63,22 +71,44 @@ restore_branch() {
 }
 trap restore_branch EXIT
 
-echo "==> Fetching $UPSTREAM_REMOTE (with tags)"
-git fetch "$UPSTREAM_REMOTE" --tags --prune
+echo "==> Fetching $UPSTREAM_REMOTE (branches only; tags discovered via ls-remote)"
+git fetch "$UPSTREAM_REMOTE" --no-tags --prune
 
 echo "==> Fast-forwarding $MASTER_BRANCH -> $UPSTREAM_REMOTE/$MASTER_BRANCH"
 git checkout "$MASTER_BRANCH"
 git merge --ff-only "$UPSTREAM_REMOTE/$MASTER_BRANCH"
 
-latest_tag="$(git -c 'versionsort.suffix=-' tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort='-version:refname' | head -n1)"
+latest_tag="$(git ls-remote --tags --refs "$UPSTREAM_REMOTE" 'v[0-9]*' \
+    | awk '{sub("refs/tags/", "", $2); print $2}' \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+    | sort -V \
+    | tail -n1)"
 if [ -z "$latest_tag" ]; then
     echo "error: no vX.Y.Z tags found on $UPSTREAM_REMOTE" >&2
     exit 1
 fi
 target_version="${latest_tag#v}"
-echo "==> Latest upstream tag: $latest_tag"
+target_sha="$(git ls-remote "$UPSTREAM_REMOTE" "refs/tags/$latest_tag" | awk '{print $1}')"
+if [ -z "$target_sha" ]; then
+    echo "error: could not resolve $latest_tag on $UPSTREAM_REMOTE" >&2
+    exit 1
+fi
+echo "==> Latest upstream tag: $latest_tag ($target_sha)"
 
-echo "==> Rebasing $PATCH_BRANCH onto $latest_tag"
+# If there's a stale local tag with this name pointing at the upstream commit
+# (leftover from an older --tags fetch), delete it. Without this, the post-
+# publish `git tag vX.Y.Z` step fails because the name is already taken. We
+# only delete tags that point exactly at the upstream SHA — anything else may
+# be a real published-fork pointer worth keeping.
+if [ -n "$(git tag --list "$latest_tag")" ]; then
+    local_tag_sha="$(git rev-parse "refs/tags/$latest_tag")"
+    if [ "$local_tag_sha" = "$target_sha" ]; then
+        echo "    removing stale local $latest_tag (was pointing at upstream)"
+        git tag -d "$latest_tag" >/dev/null
+    fi
+fi
+
+echo "==> Rebasing $PATCH_BRANCH onto $latest_tag ($target_sha)"
 git checkout "$PATCH_BRANCH"
 
 # Drop the previous run's cleanup commit so the rebase only replays real patches.
@@ -89,7 +119,7 @@ if [ "$(git log -1 --format='%s' HEAD)" = "$CLEANUP_MSG" ]; then
     git reset --hard HEAD~1
 fi
 
-if ! git rebase "$latest_tag"; then
+if ! git rebase "$target_sha"; then
     echo "" >&2
     echo "Rebase hit conflicts. Resolve them and run:" >&2
     echo "    git rebase --continue" >&2
