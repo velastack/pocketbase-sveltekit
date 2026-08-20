@@ -26,8 +26,9 @@
 #   cleaned up so `git tag vX.Y.Z` after publish works without --force.
 #
 # After a successful rebase the script:
-#   1. Sets the fork's name/description/repo via `npm pkg set`. The version
-#      line is whatever upstream tagged, untouched.
+#   1. Sets the fork's name/description/repo and the `files` publish allowlist
+#      via `npm pkg set`. The version line is whatever upstream tagged,
+#      untouched.
 #   2. Removes any upstream-tracked dist/* files (the package is built by CI).
 #   3. Commits the changes as `sveltekit: pin metadata and drop dist/`.
 #
@@ -154,6 +155,14 @@ npm pkg set "name=$FORK_NAME"
 npm pkg set "description=$FORK_DESCRIPTION"
 npm pkg set "repository.type=git"
 npm pkg set "repository.url=$FORK_REPO_URL"
+
+# Publish only the built package. Upstream's .npmignore is a denylist that
+# doesn't cover .github/ or scripts/, so those repo-tooling files were ending
+# up in the tarball. An allowlist here beats patching upstream's .npmignore
+# (which would conflict on every rebase). npm adds package.json, README and
+# LICENSE automatically; CHANGELOG has to be listed explicitly to survive.
+npm pkg set "files[0]=dist"
+npm pkg set "files[1]=CHANGELOG.md"
 
 if [ -n "$(git ls-files dist/ 2>/dev/null)" ]; then
     echo "==> Removing upstream-tracked dist/ (rebuilt by CI)"
