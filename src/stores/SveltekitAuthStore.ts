@@ -1,6 +1,10 @@
 import { BaseAuthStore } from "./BaseAuthStore";
 import type { Cookies } from "@sveltejs/kit";
-import type { CookieSerializeOptions } from "cookie";
+
+// Derived from `Cookies` so the option types follow the installed SvelteKit version
+// (Kit 2 requires `path`, Kit 3 makes it optional and uses cookie 1.x's `SerializeOptions`).
+type CookieSetOptions = NonNullable<Parameters<Cookies["set"]>[2]>;
+type CookieDeleteOptions = NonNullable<Parameters<Cookies["delete"]>[1]>;
 
 const defaultCookieKey = "pb_auth";
 
@@ -20,9 +24,7 @@ export class SvelteKitAuthStore extends BaseAuthStore {
     saveCookie(
         cookies: Cookies,
         key = defaultCookieKey,
-        opts: CookieSerializeOptions & {
-            path: string;
-        } = {
+        opts: CookieSetOptions = {
             path: "/",
         },
     ) {
@@ -35,7 +37,7 @@ export class SvelteKitAuthStore extends BaseAuthStore {
     clearCookie(
         cookies: Cookies,
         key = defaultCookieKey,
-        opts: CookieSerializeOptions & { path: string } = {
+        opts: CookieDeleteOptions = {
             path: "/",
         },
     ) {

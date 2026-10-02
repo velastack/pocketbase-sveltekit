@@ -463,7 +463,7 @@ and pass it to the other server-side actions using the `event.locals`.
 // src/hooks.server.js
 import PocketBase from 'pocketbase';
 
-/** @type {import('@sveltejs/kit').Handle} */
+/** @type {import('@sveltejs/kit/hooks').Handle} */ // SvelteKit 2: import('@sveltejs/kit').Handle
 export async function handle({ event, resolve }) {
     event.locals.pb = new PocketBase('http://127.0.0.1:8090');
 
