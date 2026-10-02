@@ -1,3 +1,10 @@
+## 0.28.2
+
+- `SvelteKitAuthStore` cookie option types now derive from SvelteKit's own `Cookies` type instead of `cookie`'s `CookieSerializeOptions`, so they match both SvelteKit 2 and 3 (where `path` is optional).
+
+- Declared `@sveltejs/kit` (`^2.0.0 || ^3.0.0`) as an optional peer dependency.
+
+
 ## 0.28.1
 
 - Minor optimization and correctness fix for `pb.filter()` to execute in a single pass and avoid regex chaining issues.

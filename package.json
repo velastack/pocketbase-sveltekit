@@ -1,5 +1,5 @@
 {
-    "version": "0.28.1",
+    "version": "0.28.2",
     "name": "pocketbase-sveltekit",
     "description": "PocketBase JavaScript SDK for SvelteKit",
     "author": "Gani Georgiev",
@@ -19,6 +19,14 @@
     "types": "./dist/pocketbase.es.d.mts",
     "engines": {
         "node": ">=20"
+    },
+    "peerDependencies": {
+        "@sveltejs/kit": "^2.0.0 || ^3.0.0"
+    },
+    "peerDependenciesMeta": {
+        "@sveltejs/kit": {
+            "optional": true
+        }
     },
     "overrides": {
         "browserslist-generator": "^3.0.0"
@@ -45,7 +53,6 @@
     },
     "devDependencies": {
         "@sveltejs/kit": "^2.25.1",
-        "@types/cookie": "^0.6.0",
         "prettier": "3.2.4",
         "rollup": "^4.0.0",
         "rollup-plugin-ts": "^3.0.0",
