@@ -524,7 +524,7 @@ export class RecordService<M = RecordModel> extends CrudService<M> {
      * it doesn't allow `window.open` calls as part of an `async` click functions.
      * To workaround this you can either change your click handler to not be marked as `async`
      * OR manually call `window.open` before your `async` function and use the
-     * window reference in your own custom `urlCallback` (see https://github.com/pocketbase/pocketbase/discussions/2429#discussioncomment-5943061).
+     * window reference in your own custom `urlCallback` (see https://ganigeorgiev.com/pocketbase/discussions/2429#comment-u32hbyzvzfduk8z).
      * For example:
      * ```js
      * <button id="btn">Login with Gitlab</button>
@@ -568,7 +568,7 @@ export class RecordService<M = RecordModel> extends CrudService<M> {
         // open a new popup window in case config.urlCallback is not set
         //
         // note: it is opened before any async calls due to Safari restrictions
-        // (see https://github.com/pocketbase/pocketbase/discussions/2429#discussioncomment-5943061)
+        // (see https://ganigeorgiev.com/pocketbase/discussions/2429#comment-u32hbyzvzfduk8z)
         let eagerDefaultPopup: Window | null = null;
         if (!config.urlCallback) {
             eagerDefaultPopup = openBrowserPopup(undefined);

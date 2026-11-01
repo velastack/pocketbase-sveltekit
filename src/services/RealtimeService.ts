@@ -391,6 +391,7 @@ export class RealtimeService extends BaseService {
         }
     }
 
+    // @todo consider exporting as reconnect and/or auto call on auth state change
     private async connect(): Promise<void> {
         if (this.reconnectAttempts > 0) {
             // immediately resolve the promise to avoid indefinitely

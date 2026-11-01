@@ -6,7 +6,7 @@ export function isFile(val: any): boolean {
         (typeof Blob !== "undefined" && val instanceof Blob) ||
         (typeof File !== "undefined" && val instanceof File) ||
         // check for React Native file object format
-        // (see https://github.com/pocketbase/pocketbase/discussions/2002#discussioncomment-5254168)
+        // (see https://ganigeorgiev.com/pocketbase/discussions/2002#comment-mruqg2o3j3vujsi)
         (val !== null &&
             typeof val === "object" &&
             val.uri &&
@@ -70,7 +70,7 @@ export function convertToFormDataIfNeeded(body: any): any {
         const val = body[key];
 
         // skip undefined values for consistency with JSON.stringify
-        // (see https://github.com/pocketbase/pocketbase/issues/6731#issuecomment-2812382827)
+        // (see https://ganigeorgiev.com/pocketbase/discussions/6731#comment-5v564g1mzopqmot)
         if (typeof val === "undefined") {
             continue;
         }

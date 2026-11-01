@@ -1,3 +1,8 @@
+## 0.28.2
+
+- Replaced old GitHub links with the new host.
+
+
 ## 0.28.1
 
 - Minor optimization and correctness fix for `pb.filter()` to execute in a single pass and avoid regex chaining issues.

@@ -499,6 +499,7 @@ declare class RealtimeService extends BaseService {
     private sendSubscriptions;
     private addAllSubscriptionListeners;
     private removeAllSubscriptionListeners;
+    // @todo consider exporting as reconnect and/or auto call on auth state change
     private connect;
     private initConnect;
     private connectErrorHandler;
@@ -837,7 +838,7 @@ declare class RecordService<M = RecordModel> extends CrudService<M> {
      * it doesn't allow `window.open` calls as part of an `async` click functions.
      * To workaround this you can either change your click handler to not be marked as `async`
      * OR manually call `window.open` before your `async` function and use the
-     * window reference in your own custom `urlCallback` (see https://github.com/pocketbase/pocketbase/discussions/2429#discussioncomment-5943061).
+     * window reference in your own custom `urlCallback` (see https://ganigeorgiev.com/pocketbase/discussions/2429#comment-u32hbyzvzfduk8z).
      * For example:
      * ```js
      * <button id="btn">Login with Gitlab</button>
