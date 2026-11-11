@@ -1,3 +1,9 @@
+## 0.29.0
+
+- ⚠️ Auto clear `pb.authStore` in case of expired or externally invalidated token (e.g. after 401 response).
+  If for whatever reason you don't want this behavior you can disable it with `pb.autoClearAuthStore(false)`.
+
+
 ## 0.28.2
 
 - Replaced old GitHub links with the new host.

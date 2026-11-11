@@ -1,7 +1,8 @@
-import { describe, assert, expect, test, beforeAll, afterAll, afterEach } from "vitest";
 import Client from "@/Client";
-import { LocalAuthStore } from "@/stores/LocalAuthStore";
+import { ClientResponseError } from "@/ClientResponseError";
 import { RecordService } from "@/services/RecordService";
+import { LocalAuthStore } from "@/stores/LocalAuthStore";
+import { afterAll, afterEach, assert, beforeAll, describe, expect, test } from "vitest";
 import { FetchMock } from "./mocks";
 
 describe("Client", function () {
@@ -814,5 +815,53 @@ describe("Client", function () {
             await expect(requestB).resolves.toBeDefined();
             await expect(requestC).resolves.toBeDefined();
         });
+    });
+
+    describe("auto clear authStore", function () {
+        const statusScenarios: { [index: number]: boolean } = {
+            200: false,
+            400: false,
+            402: false,
+            401: true,
+            403: false,
+            404: false,
+            408: false,
+            429: false,
+            500: false,
+            503: false,
+        };
+
+        function runScenario(enable: null | boolean, status: any, cleared: boolean) {
+            test(`enableAutoClearAuthStore=${enable} with status ${status}`, async function () {
+                const client = new Client("test_base_url");
+
+                if (enable != null) {
+                    client.autoClearAuthStore(enable);
+                }
+
+                client.authStore.save("test_token");
+
+                assert.equal(client.authStore.token, "test_token");
+
+                try {
+                    await client.send("/test", {
+                        method: "GET",
+                        fetch: async (): Promise<any> => {
+                            return new ClientResponseError({
+                                status: status << 0,
+                            });
+                        },
+                    });
+                } catch (_) {}
+
+                assert.equal(client.authStore.token, cleared ? "" : "test_token");
+            });
+        }
+
+        for (let status in statusScenarios) {
+            runScenario(null, status, statusScenarios[status]); // default
+            runScenario(true, status, statusScenarios[status]); // explicitly enabled
+            runScenario(false, status, false); // explicitly disabled
+        }
     });
 });

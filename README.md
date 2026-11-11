@@ -252,8 +252,6 @@ BaseAuthStore {
 }
 ```
 
-To _"logout"_ the authenticated record you can call `pb.authStore.clear()`.
-
 To _"listen"_ for changes in the auth store, you can register a new listener via `pb.authStore.onChange`, eg:
 ```js
 // triggered everytime on store change
@@ -270,6 +268,11 @@ const removeListener2 = pb.authStore.onChange((token, record) => {
 removeListener1();
 removeListener2();
 ```
+
+To _"logout"_ the authenticated record you can call `pb.authStore.clear()`.
+
+Note that by default the store is automatically cleared when sending requests with expired or invalidated token (e.g. on 401 response).
+You can disable this behavior with `pb.autoClearAuthStore(false)`.
 
 
 ### Auto cancellation

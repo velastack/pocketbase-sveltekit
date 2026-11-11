@@ -1,32 +1,32 @@
 import { ClientResponseError } from "@/ClientResponseError";
-import { BaseAuthStore } from "@/stores/BaseAuthStore";
-import { LocalAuthStore } from "@/stores/LocalAuthStore";
-import { SettingsService } from "@/services/SettingsService";
-import { RecordService } from "@/services/RecordService";
+import { BackupService } from "@/services/BackupService";
+import { BatchService } from "@/services/BatchService";
 import { CollectionService } from "@/services/CollectionService";
+import { CronService } from "@/services/CronService";
+import { FileService } from "@/services/FileService";
+import { HealthService } from "@/services/HealthService";
 import { LogService } from "@/services/LogService";
 import { RealtimeService } from "@/services/RealtimeService";
-import { HealthService } from "@/services/HealthService";
-import { FileService } from "@/services/FileService";
-import { BackupService } from "@/services/BackupService";
-import { CronService } from "@/services/CronService";
+import { RecordService } from "@/services/RecordService";
+import { SettingsService } from "@/services/SettingsService";
 import { SQLService } from "@/services/SQLService";
-import { BatchService } from "@/services/BatchService";
+import { BaseAuthStore } from "@/stores/BaseAuthStore";
+import { LocalAuthStore } from "@/stores/LocalAuthStore";
 import { RecordModel } from "@/tools/dtos";
+import { convertToFormDataIfNeeded, isFormData } from "@/tools/formdata";
 import {
-    SendOptions,
     FileOptions,
     normalizeUnknownQueryParams,
+    SendOptions,
     serializeQueryParams,
 } from "@/tools/options";
-import { isFormData, convertToFormDataIfNeeded } from "@/tools/formdata";
 
 // @todo remove after upgrading the Node.js dev setup
-if (!((RegExp as any).escape)) {
+if (!(RegExp as any).escape) {
     // https://stackoverflow.com/questions/3561493/is-there-a-regexp-escape-function-in-javascript#answer-3561711
-    (RegExp as any).escape = function(str: string): string {
-        return str.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
-    }
+    (RegExp as any).escape = function (str: string): string {
+        return str.replace(/[/\-\\^$*+?.()|[\]{}]/g, "\\$&");
+    };
 }
 
 export interface BeforeSendResult {
@@ -175,6 +175,7 @@ export default class Client {
     private cancelControllers: { [key: string]: AbortController } = {};
     private recordServices: { [key: string]: RecordService } = {};
     private enableAutoCancellation: boolean = true;
+    private enableAutoClearAuthStore: boolean = true;
 
     constructor(baseURL = "/", authStore?: BaseAuthStore | null, lang = "en-US") {
         this.baseURL = baseURL;
@@ -242,10 +243,21 @@ export default class Client {
     }
 
     /**
-     * Globally enable or disable auto cancellation for pending duplicated requests.
+     * Globally enable or disable auto cancellation for pending
+     * duplicated requests (true by default).
      */
     autoCancellation(enable: boolean): Client {
         this.enableAutoCancellation = !!enable;
+
+        return this;
+    }
+
+    /**
+     * Enable or disable auto auth store cleanup in case of expired
+     * or invalidated token (e.g. after 401 response; true by default).
+     */
+    autoClearAuthStore(enable: boolean): Client {
+        this.enableAutoClearAuthStore = !!enable;
 
         return this;
     }
@@ -304,14 +316,16 @@ export default class Client {
             return raw;
         }
 
-        const paramsWithPlaceholders: { [key: string]: any } = {}
+        const paramsWithPlaceholders: { [key: string]: any } = {};
         for (const k in params) {
-            paramsWithPlaceholders["{:" + k + "}"] = params[k]
+            paramsWithPlaceholders["{:" + k + "}"] = params[k];
         }
 
-        const pattern = Object.keys(paramsWithPlaceholders).map((k) => (RegExp as any).escape(k)).join("|")
+        const pattern = Object.keys(paramsWithPlaceholders)
+            .map((k) => (RegExp as any).escape(k))
+            .join("|");
         if (!pattern) {
-            return raw // no params to replace
+            return raw; // no params to replace
         }
 
         function stringify(val: any): string {
@@ -341,7 +355,9 @@ export default class Client {
             }
         }
 
-        return raw.replace(new RegExp(pattern, "g"), (match) => stringify(paramsWithPlaceholders[match]))
+        return raw.replace(new RegExp(pattern, "g"), (match) =>
+            stringify(paramsWithPlaceholders[match]),
+        );
     }
 
     /**
@@ -485,6 +501,13 @@ export default class Client {
             .catch((err) => {
                 // wrap to normalize all errors
                 throw new ClientResponseError(err);
+            })
+            .catch((err) => {
+                if (this.enableAutoClearAuthStore && err.status == 401) {
+                    this.authStore.clear();
+                }
+
+                throw err;
             });
     }
 
@@ -541,7 +564,8 @@ export default class Client {
 
         // check if Authorization header can be added
         if (
-            // has valid token
+            // @todo consider adding isValid token check for consistency with the Dart SDK
+            // has token
             this.authStore.token &&
             // auth header is not explicitly set
             this.getHeader(options.headers, "Authorization") === null
