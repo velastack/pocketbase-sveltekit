@@ -143,7 +143,12 @@ if [ -n "${FORK_VERSION:-}" ]; then
     fork_version="$FORK_VERSION"
 elif [ "$BUMP" = true ]; then
     fork_version="$(next_free_patch "$(next_patch "$prev_version")")"
-elif git merge-base --is-ancestor "$target_sha" "$PATCH_BRANCH"; then
+elif git merge-base --is-ancestor "$target_sha" "$PATCH_BRANCH" \
+    && [ -n "$(git log --format=%H --extended-regexp --grep="^${CLEANUP_MSG}\$" \
+        "$MASTER_BRANCH..$PATCH_BRANCH")" ]; then
+    # Already released from this base: the cleanup commit holds our version.
+    # (Without a cleanup commit, e.g. after resolving a rebase conflict by
+    # hand, package.json has upstream's raw version and we fall through.)
     fork_version="$prev_version"
 else
     fork_version="$(next_free_patch "$target_version")"

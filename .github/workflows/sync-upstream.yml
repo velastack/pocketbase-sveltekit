@@ -12,7 +12,10 @@ name: Sync upstream
 # GITHUB_TOKEN: GitHub refuses rebased commits that touch .github/workflows/
 # from GITHUB_TOKEN, and tags pushed with GITHUB_TOKEN don't start publish.yml.
 #
-# A rebase conflict or failing test pushes nothing and opens an issue.
+# A rebase conflict or failing test pushes nothing and fails the run, and so
+# does a tagged version that publish.yml hasn't put on npm within two hours.
+# GitHub emails failed scheduled runs to whoever last edited the cron line.
+# (Issues are disabled on this repo, so there's no issue to open.)
 #
 # Fork-only release: commit the change to sveltekit (no version bump, notes in
 # CHANGELOG-sveltekit.md), then run this workflow by hand with "bump" checked.
@@ -33,7 +36,6 @@ on:
 
 permissions:
   contents: read
-  issues: write # report failures
   actions: write # keep the schedule enabled
 
 concurrency:
@@ -90,6 +92,25 @@ jobs:
             echo "needed=$needed"
           } >> "$GITHUB_OUTPUT"
 
+      # publish.yml runs from the deploy key's tag push, so nobody is emailed
+      # when it fails; this run fails instead
+      - name: Check the latest release reached npm
+        if: steps.rebase.outputs.needed == 'false'
+        env:
+          VERSION: ${{ steps.rebase.outputs.version }}
+        run: |
+          if [ -n "$(npm view "pocketbase-sveltekit@$VERSION" version 2>/dev/null)" ]; then
+            echo "$VERSION is on npm"
+            exit 0
+          fi
+          age=$(( $(date +%s) - $(git log -1 --format=%ct "v$VERSION") ))
+          if [ "$age" -lt 7200 ]; then
+            echo "v$VERSION was tagged recently, publish.yml may still be running"
+            exit 0
+          fi
+          echo "::error title=v$VERSION is not on npm::v$VERSION is tagged but not published. Find the publish.yml run for the tag, fix the cause and re-run it."
+          exit 1
+
       - name: Install dependencies
         if: steps.rebase.outputs.needed == 'true' || inputs.dry_run
         run: npm install --legacy-peer-deps --no-audit --no-fund
@@ -118,30 +139,7 @@ jobs:
             --force-with-lease="refs/heads/sveltekit:$OLD_SHA" \
             origin sveltekit:refs/heads/sveltekit "refs/tags/v$VERSION"
 
-      - name: Report the failure
+      - name: Explain the failure
         if: failure() && !inputs.dry_run
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          title="Upstream sync failed"
-          existing="$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number // empty')"
-          if [ -n "$existing" ]; then
-            echo "issue #$existing is already open"
-            exit 0
-          fi
-          gh issue create --title "$title" --body "$(cat <<EOF
-          The scheduled sync with pocketbase/js-sdk failed: $RUN_URL
-
-          Nothing was pushed or published. Usually this is a rebase conflict between upstream and the fork patches. To fix it locally:
-
-          \`\`\`
-          bash scripts/rebase-upstream.sh   # resolve conflicts, git rebase --continue, re-run
-          npm install --legacy-peer-deps && npm test
-          git push origin sveltekit --force-with-lease
-          \`\`\`
-
-          The next scheduled run then tags and publishes. Close this issue once it has.
-          EOF
-          )"
+          echo "::error title=Upstream sync failed::Nothing was pushed. If the rebase step failed it's a conflict between upstream and the fork patches: run bash scripts/rebase-upstream.sh locally, resolve, git rebase --continue, re-run the script, npm test, then git push origin sveltekit --force-with-lease. The next scheduled run tags and publishes."
