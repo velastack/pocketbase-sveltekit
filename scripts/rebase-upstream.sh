@@ -25,20 +25,44 @@
 #   still pointing at an upstream commit (from an older `--tags` fetch) is
 #   cleaned up so `git tag vX.Y.Z` after publish works without --force.
 #
+#   For the same reason fork patches don't add entries to CHANGELOG.md (upstream
+#   prepends to it on every release, so every patch that does is a conflict).
+#   Fork-only notes go in CHANGELOG-sveltekit.md.
+#
 # After a successful rebase the script:
-#   1. Sets the fork's name/description/repo, the `files` publish allowlist
-#      and the non-watching `test` script via `npm pkg set`. The version line
-#      is whatever upstream tagged, untouched.
+#   1. Sets the fork's name/description/repo, the `files` publish allowlist,
+#      the non-watching `test` script and the version via `npm pkg set`.
 #   2. Removes any upstream-tracked dist/* files (the package is built by CI).
 #   3. Commits the changes as `sveltekit: pin metadata and drop dist/`.
+#
+# Versioning (fork releases share npm's version namespace with nothing else,
+# but fork-only releases can take a number upstream later uses):
+#   - New upstream release vX.Y.Z: publish as X.Y.Z, or the next free patch
+#     version if X.Y.Z is already on npm (e.g. upstream 0.28.2 -> 0.28.3 when a
+#     fork-only 0.28.2 exists).
+#   - `--bump`: release fork-only changes as the next free patch version above
+#     the current one, even without a new upstream release.
+#   - Otherwise (already on the latest upstream tag) keep the current version,
+#     so re-running the script is a no-op.
+#   FORK_VERSION=x.y.z overrides all of the above.
 #
 # After this script:
 #   - Push the branch:        git push origin sveltekit --force-with-lease
 #   - Tag and push the tag:   git tag vX.Y.Z && git push origin vX.Y.Z
 #     The tag push triggers .github/workflows/publish.yml which builds and
 #     publishes to npm via Trusted Publishing.
+#   .github/workflows/sync-upstream.yml runs this script on a schedule and does
+#   both pushes, so normally none of this is manual.
 
 set -euo pipefail
+
+BUMP=false
+for arg in "$@"; do
+    case "$arg" in
+        --bump) BUMP=true ;;
+        *) echo "usage: $0 [--bump]" >&2; exit 1 ;;
+    esac
+done
 
 UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 ORIGIN_REMOTE="${ORIGIN_REMOTE:-origin}"
@@ -94,7 +118,37 @@ if [ -z "$target_sha" ]; then
     echo "error: could not resolve $latest_tag on $UPSTREAM_REMOTE" >&2
     exit 1
 fi
+# Make sure the tagged commit is local even if it isn't on upstream's master,
+# and peel it in case the tag is annotated.
+git fetch --quiet --no-tags "$UPSTREAM_REMOTE" "refs/tags/$latest_tag"
+target_sha="$(git rev-parse "FETCH_HEAD^{commit}")"
 echo "==> Latest upstream tag: $latest_tag ($target_sha)"
+
+# Decide the version to publish before the branch is rewritten (see the
+# Versioning section above).
+prev_version="$(git show "$PATCH_BRANCH:package.json" | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).version')"
+published_versions="$(npm view "$FORK_NAME" versions --json 2>/dev/null \
+    | node -p 'const v = JSON.parse(require("fs").readFileSync(0, "utf8") || "[]"); [].concat(v).join("\n")')"
+next_patch() {
+    node -p "const [a, b, c] = '$1'.split('.').map(Number); [a, b, c + 1].join('.')"
+}
+next_free_patch() {
+    local v="$1"
+    while printf '%s\n' "$published_versions" | grep -qxF "$v"; do
+        v="$(next_patch "$v")"
+    done
+    echo "$v"
+}
+if [ -n "${FORK_VERSION:-}" ]; then
+    fork_version="$FORK_VERSION"
+elif [ "$BUMP" = true ]; then
+    fork_version="$(next_free_patch "$(next_patch "$prev_version")")"
+elif git merge-base --is-ancestor "$target_sha" "$PATCH_BRANCH"; then
+    fork_version="$prev_version"
+else
+    fork_version="$(next_free_patch "$target_version")"
+fi
+echo "==> Version: $fork_version (upstream $target_version, currently $prev_version)"
 
 # If there's a stale local tag with this name pointing at the upstream commit
 # (leftover from an older --tags fetch), delete it. Without this, the post-
@@ -155,14 +209,16 @@ npm pkg set "name=$FORK_NAME"
 npm pkg set "description=$FORK_DESCRIPTION"
 npm pkg set "repository.type=git"
 npm pkg set "repository.url=$FORK_REPO_URL"
+npm pkg set "version=$fork_version"
 
 # Publish only the built package. Upstream's .npmignore is a denylist that
 # doesn't cover .github/ or scripts/, so those repo-tooling files were ending
 # up in the tarball. An allowlist here beats patching upstream's .npmignore
 # (which would conflict on every rebase). npm adds package.json, README and
-# LICENSE automatically; CHANGELOG has to be listed explicitly to survive.
+# LICENSE automatically; the changelogs have to be listed explicitly.
 npm pkg set "files[0]=dist"
 npm pkg set "files[1]=CHANGELOG.md"
+npm pkg set "files[2]=CHANGELOG-sveltekit.md"
 
 # Upstream's `test` script is bare `vitest`, which is watch mode -- it never
 # exits outside a TTY, so it hangs CI and any scripted run. Pin the one-shot
@@ -183,11 +239,6 @@ else
     echo "==> Nothing to clean up (already in sync)"
 fi
 
-pkg_version="$(node -p "require('./package.json').version" 2>/dev/null || echo "")"
-if [ -n "$pkg_version" ] && [ "$pkg_version" != "$target_version" ]; then
-    echo "warning: package.json version is $pkg_version, expected $target_version" >&2
-fi
-
 master_sha="$(git rev-parse --short "$MASTER_BRANCH")"
 patch_sha="$(git rev-parse --short "$PATCH_BRANCH")"
 
@@ -195,11 +246,11 @@ cat <<EOF
 
 ==> Done.
     $MASTER_BRANCH   $master_sha  ($UPSTREAM_REMOTE/$MASTER_BRANCH)
-    $PATCH_BRANCH $patch_sha  (based on $latest_tag, package version $pkg_version)
+    $PATCH_BRANCH $patch_sha  (based on $latest_tag, package version $fork_version)
 
 Next steps:
     npm install --legacy-peer-deps && npm test
     git push $ORIGIN_REMOTE $PATCH_BRANCH --force-with-lease
-    git tag v$target_version && git push $ORIGIN_REMOTE v$target_version
+    git tag v$fork_version && git push $ORIGIN_REMOTE v$fork_version
         (tag push triggers .github/workflows/publish.yml -> npm publish)
 EOF

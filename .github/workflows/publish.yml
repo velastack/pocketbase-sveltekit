@@ -10,6 +10,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      issues: write # report failures
     steps:
       - uses: actions/checkout@v6
 
@@ -41,3 +42,15 @@ jobs:
 
       - name: Publish
         run: npm publish --provenance --access public
+
+      # tag pushes come from sync-upstream.yml's deploy key, so nobody gets
+      # the usual failure email
+      - name: Report the failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create --title "Publishing $GITHUB_REF_NAME to npm failed" \
+            --body "$RUN_URL — re-run the failed job once the cause is fixed."

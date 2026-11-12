@@ -1,0 +1,147 @@
+name: Sync upstream
+
+# Follows pocketbase/js-sdk releases. Every run rebases the sveltekit branch
+# onto upstream's latest release tag with scripts/rebase-upstream.sh (which
+# also picks the version, see the script). If that version has no vX.Y.Z tag on
+# this repo yet, the tests run, then the branch is force-pushed and the tag is
+# pushed. The tag push starts publish.yml, which publishes to npm. Publishing
+# stays in publish.yml because npm trusted publishing is configured for that
+# filename.
+#
+# Pushes use the PUSH_DEPLOY_KEY secret (a deploy key with write access), not
+# GITHUB_TOKEN: GitHub refuses rebased commits that touch .github/workflows/
+# from GITHUB_TOKEN, and tags pushed with GITHUB_TOKEN don't start publish.yml.
+#
+# A rebase conflict or failing test pushes nothing and opens an issue.
+#
+# Fork-only release: commit the change to sveltekit (no version bump, notes in
+# CHANGELOG-sveltekit.md), then run this workflow by hand with "bump" checked.
+
+on:
+  schedule:
+    - cron: "41 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Release the fork's own changes as the next patch version"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Rebase and test only, push nothing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write # report failures
+  actions: write # keep the schedule enabled
+
+concurrency:
+  group: sync-upstream
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      # GitHub disables schedules in public repos after 60 days without
+      # activity, and upstream can go that long between releases.
+      - name: Keep the schedule enabled
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/sync-upstream.yml/enable"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: sveltekit
+          fetch-depth: 0
+          ssh-key: ${{ secrets.PUSH_DEPLOY_KEY }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Rebase onto the latest upstream release
+        id: rebase
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/pocketbase/js-sdk.git
+          git fetch --quiet --no-tags upstream
+          git branch master upstream/master
+
+          old_sha="$(git rev-parse HEAD)"
+          args=()
+          [ "$BUMP" = true ] && args+=(--bump)
+          bash scripts/rebase-upstream.sh "${args[@]}"
+
+          version="$(node -p "require('./package.json').version")"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            echo "v$version is already tagged, nothing to release"
+            needed=false
+          else
+            echo "v$version is new, releasing"
+            needed=true
+          fi
+          {
+            echo "old_sha=$old_sha"
+            echo "version=$version"
+            echo "needed=$needed"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        if: steps.rebase.outputs.needed == 'true' || inputs.dry_run
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Test
+        if: steps.rebase.outputs.needed == 'true' || inputs.dry_run
+        run: npm test
+
+      - name: Build
+        if: steps.rebase.outputs.needed == 'true' || inputs.dry_run
+        run: npm run build
+
+      - name: Push the branch and tag
+        if: steps.rebase.outputs.needed == 'true' || inputs.dry_run
+        env:
+          OLD_SHA: ${{ steps.rebase.outputs.old_sha }}
+          VERSION: ${{ steps.rebase.outputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          # in a dry run with nothing to release the tag already exists
+          git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null || git tag "v$VERSION"
+          # --dry-run still authenticates against origin, so a dry run checks
+          # the deploy key too
+          [ "$DRY_RUN" = true ] && dry=--dry-run || dry=
+          git push $dry --atomic \
+            --force-with-lease="refs/heads/sveltekit:$OLD_SHA" \
+            origin sveltekit:refs/heads/sveltekit "refs/tags/v$VERSION"
+
+      - name: Report the failure
+        if: failure() && !inputs.dry_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Upstream sync failed"
+          existing="$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            echo "issue #$existing is already open"
+            exit 0
+          fi
+          gh issue create --title "$title" --body "$(cat <<EOF
+          The scheduled sync with pocketbase/js-sdk failed: $RUN_URL
+
+          Nothing was pushed or published. Usually this is a rebase conflict between upstream and the fork patches. To fix it locally:
+
+          \`\`\`
+          bash scripts/rebase-upstream.sh   # resolve conflicts, git rebase --continue, re-run
+          npm install --legacy-peer-deps && npm test
+          git push origin sveltekit --force-with-lease
+          \`\`\`
+
+          The next scheduled run then tags and publishes. Close this issue once it has.
+          EOF
+          )"
