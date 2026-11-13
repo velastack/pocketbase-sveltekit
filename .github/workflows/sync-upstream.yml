@@ -1,6 +1,8 @@
 name: Sync upstream
 
-# Follows pocketbase/js-sdk releases. Every run rebases the sveltekit branch
+# Follows pocketbase/js-sdk releases. Upstream left GitHub and now lives at
+# https://ganigeorgiev.com/git/pocketbase/js-sdk; the GitHub repo is frozen at
+# v0.28.1. Every run rebases the sveltekit branch
 # onto upstream's latest release tag with scripts/rebase-upstream.sh (which
 # also picks the version, see the script). If that version has no vX.Y.Z tag on
 # this repo yet, the tests run, then the branch is force-pushed and the tag is
@@ -69,7 +71,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git remote add upstream https://github.com/pocketbase/js-sdk.git
+          git remote add upstream https://ganigeorgiev.com/git/pocketbase/js-sdk
           git fetch --quiet --no-tags upstream
           git branch master upstream/master
 

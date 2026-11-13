@@ -1,8 +1,8 @@
 # pocketbase-sveltekit changelog
 
 Changes specific to this fork. Everything else comes from upstream
-[pocketbase/js-sdk](https://github.com/pocketbase/js-sdk) and is listed in
-`CHANGELOG.md`.
+[pocketbase/js-sdk](https://ganigeorgiev.com/git/pocketbase/js-sdk) and is
+listed in `CHANGELOG.md`.
 
 Each release uses upstream's version number when it is free on npm. If a
 fork-only release has already taken that number, the release goes out as the

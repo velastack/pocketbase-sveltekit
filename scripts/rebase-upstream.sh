@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 #
 # Rebase the `sveltekit` patch branch onto the latest upstream release tag
-# from pocketbase/js-sdk, and fast-forward `master` to upstream/master.
+# from pocketbase/js-sdk (https://ganigeorgiev.com/git/pocketbase/js-sdk),
+# and fast-forward `master` to upstream/master.
 #
 # Assumed branch layout:
-#   - remote `upstream` -> pocketbase/js-sdk
+#   - remote `upstream` -> https://ganigeorgiev.com/git/pocketbase/js-sdk
 #   - remote `origin`   -> velastack/pocketbase-sveltekit
 #   - `master` tracks `upstream/master`
 #   - `sveltekit` is `master` + our patch commit(s) + a script-managed cleanup
