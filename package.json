@@ -1,7 +1,7 @@
 {
     "version": "0.29.0",
-    "name": "pocketbase",
-    "description": "PocketBase JavaScript SDK",
+    "name": "pocketbase-sveltekit",
+    "description": "PocketBase JavaScript SDK for SvelteKit",
     "author": "Gani Georgiev",
     "license": "MIT",
     "homepage": "https://ganigeorgiev.com/pocketbase/js-sdk",
@@ -58,6 +58,11 @@
     },
     "files": [
         "dist",
-        "CHANGELOG.md"
-    ]
+        "CHANGELOG.md",
+        "CHANGELOG-sveltekit.md"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/velastack/pocketbase-sveltekit.git"
+    }
 }
